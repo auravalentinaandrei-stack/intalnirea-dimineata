@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>Intalnirea de dimineata</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- ✅ ADAUGAT: incarcare automata din date.json -->
+<script>
+async function incarcaDateDinFisier() {
+  try {
+    const r = await fetch("./date.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("Nu exista date.json");
+    return await r.json();
+  } catch (e) {
+    console.log("Nu pot incarca date.json:", e.message);
+    return null;
+  }
+}
+</script>
+
+<style>
+body{
+ font-family: Comic Sans MS, Arial;
+ background:#eef2f7;
+ padding:20px;
+}
+h1{text-align:center}
+.sectiune{
+ background:white;
+ border-radius:20px;
+ padding:15px;
+ margin-bottom:25px;
+ box-shadow:0 0 10px rgba(0,0,0,.2);
+}
+
+/* COPII */
+.copii{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}
+.copil{border:4px solid #ccc;border-radius:20px;padding:8px;text-align:center}
+.copil.prezent{background:#d4f5e2;border-color:#2ecc71}
+.copil.absent{background:#f9d6d5;border-color:#e74c3c}
+.copil img{width:110px;height:110px;object-fit:cover;border-radius:12px;border:3px solid #555}
+.numeCopil{margin-top:5px;font-weight:bold;background:#ffffffcc;border-radius:10px;padding:4px}
+.btnPrezent{background:#2ecc71;color:white;border:none;padding:5px 8px;border-radius:10px;margin:2px}
+.btnAbsent{background:#e74c3c;color:white;border:none;padding:5px 8px;border-radius:10px;margin:2px}
+.btnSterge{background:#555;color:white;border:none;padding:5px 8px;border-radius:10px;margin-top:5px}
+
+/* EMOTII */
+.emotii button{font-size:22px;margin:2px;border:none;border-radius:10px;cursor:pointer;background:#eee}
+.emotii button.sel{background:#ffd966}
+
+/* ANOTIMP */
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
+.card{border:4px solid #ccc;border-radius:20px;padding:10px;text-align:center;cursor:pointer}
+.card img{width:100%;height:90px;object-fit:contain;border-radius:12px;background:#eee}
+.card.selectat{box-shadow:0 0 15px #333}
+.primavara{background:#d5f5e3;border-color:#2ecc71}
+.vara{background:#fff3cd;border-color:#f1c40f}
+.toamna{background:#fdebd0;border-color:#e67e22}
+.iarna{background:#d6eaf8;border-color:#3498db}
+.seasonName{font-size:20px;font-weight:bold;margin-top:6px}
+
+/* VREME */
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}
+.vremeIcon{font-size:60px}
+.vremeLabel{font-size:18px;font-weight:bold}
+
+/* ZILE + DATA */
+.flex{display:flex;gap:20px}
+.zile{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:50%}
+.day{padding:14px;border-radius:16px;font-size:22px;font-weight:bold;color:white;text-align:center;cursor:grab}
+.luni{background:#ff6666}
+.marti{background:#ffb84d}
+.miercuri{background:#66cc66}
+.joi{background:#66b3ff}
+.vineri{background:#cc66ff}
+.sambata{background:#ffaa80}
+.duminica{background:#ff8080}
+
+.zone{border:3px dashed #777;border-radius:16px;padding:14px;font-size:22px;min-height:60px;margin-bottom:10px}
+.zone span{font-weight:bold}
+
+.container{display:flex;gap:25px}
+.selectie{width:35%}
+.liste{width:65%}
+.grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.drag{padding:10px;border-radius:14px;font-size:18px;font-weight:bold;text-align:center;cursor:grab;background:#ddd}
+.iarna{background:#74b9ff;color:white}
+.primavara{background:#55efc4}
+.vara{background:#ffeaa7}
+.toamna{background:#fab1a0}
+.an{background:#b3b3ff}
+.zi{background:#dfe6e9}
+</style>
+</head>
+
+<body>
+
+<h1>🐝 Intalnirea de dimineata</h1>
+
+<!-- IMPORT / EXPORT -->
+<div class="sectiune" style="text-align:center">
+  <button onclick="exportData()" style="background:#3498db;color:white;padding:8px 14px;border:none;border-radius:10px;font-weight:bold;margin-right:10px">
+    Exporta setarile
+  </button>
+
+  <button onclick="importData()" style="background:#9b59b6;color:white;padding:8px 14px;border:none;border-radius:10px;font-weight:bold">
+    Importa setarile
+  </button>
+
+  <input type="file" id="importFile" accept=".json" style="display:none">
+</div>
+
+<button onclick="resetZiNoua()" style="background:#e67e22;color:white;padding:8px 14px;border:none;border-radius:10px;font-weight:bold;margin-left:10px">
+  Zi noua (reset selectii)
+</button>
+
+<!-- COPII -->
+<div class="sectiune">
+<h2>Prezenta si starea copiilor</h2>
+Nume <input id="nume">
+Poza <input type="file" id="poza">
+<button onclick="addChild()">Adauga copil</button>
+<div id="listaCopii" class="copii"></div>
+</div>
+
+<!-- ANOTIMP -->
+<div class="sectiune">
+<h2>Anotimpul</h2>
+<div id="anotimpuri" class="grid4"></div>
+<div style="font-size:80px;text-align:center">🐝 <span id="albina"></span></div>
+</div>
+
+<!-- VREME -->
+<div class="sectiune">
+<h2>Vremea</h2>
+<div id="vremea" class="grid5"></div>
+</div>
+
+<!-- ZILE -->
+<div class="sectiune">
+<h2>Zilele saptamanii</h2>
+<div class="flex">
+ <div class="zile">
+  <div class="day luni" draggable="true">Luni</div>
+  <div class="day marti" draggable="true">Marti</div>
+  <div class="day miercuri" draggable="true">Miercuri</div>
+  <div class="day joi" draggable="true">Joi</div>
+  <div class="day vineri" draggable="true">Vineri</div>
+  <div class="day sambata" draggable="true">Sambata</div>
+  <div class="day duminica" draggable="true">Duminica</div>
+ </div>
+ <div style="width:50%">
+  <div class="zone">IERI: <span id="ieri"></span></div>
+  <div class="zone">AZI: <span id="azi"></span></div>
+  <div class="zone">MAINE: <span id="maine"></span></div>
+ </div>
+</div>
+</div>
+
+<!-- DATA -->
+<div class="sectiune">
+<h2>Data</h2>
+<div class="container">
+ <div class="selectie">
+  <div class="zone">ZIUA: <span id="ziua"></span></div>
+  <div class="zone">LUNA: <span id="luna"></span></div>
+  <div class="zone">ANUL: <span id="anul"></span></div>
+ </div>
+ <div class="liste">
+  <div class="grid7" id="listaZile"></div>
+  <div class="grid6" id="listaLuni"></div>
+  <div class="grid7" id="listaAni"></div>
+ </div>
+</div>
+</div>
+
+<!-- RAPORT -->
+<div class="sectiune">
+<h2>Raportul zilei</h2>
+<button onclick="genRaport()">Genereaza raport</button>
+<button onclick="genPDF()">Genereaza PDF</button>
+<div id="raport"></div>
+</div>
+
+<script>
+/* DRAG & DROP */
+let dragged="";
+document.addEventListener("dragstart",e=>{
+ if(e.target.classList.contains("day")||e.target.classList.contains("drag")){
+  dragged=e.target.innerText;
+ }
+});
+document.querySelectorAll(".zone").forEach(z=>{
+ z.addEventListener("dragover",e=>e.preventDefault());
+ z.addEventListener("drop",e=>{
+  e.preventDefault();
+  z.querySelector("span").innerText=dragged;
+ });
+});
+
+/* DATA */
+for(let i=1;i<=31;i++)listaZile.innerHTML+=<div class="drag zi" draggable="true">${i}</div>;
+[
+ ["Ianuarie","iarna"],["Februarie","iarna"],["Martie","primavara"],
+ ["Aprilie","primavara"],["Mai","primavara"],["Iunie","vara"],
+ ["Iulie","vara"],["August","vara"],["Septembrie","toamna"],
+ ["Octombrie","toamna"],["Noiembrie","toamna"],["Decembrie","iarna"]
+].forEach(l=>listaLuni.innerHTML+=<div class="drag ${l[1]}" draggable="true">${l[0]}</div>);
+for(let a=2024;a<=2035;a++)listaAni.innerHTML+=<div class="drag an" draggable="true">${a}</div>;
+
+/* COPII */
+let copii=JSON.parse(localStorage.getItem("copii"))||[];
+function save(){localStorage.setItem("copii",JSON.stringify(copii))}
+function addChild(){
+ if(!nume.value||!poza.files[0])return;
+ let r=new FileReader();
+ r.onload=e=>{
+  copii.push({nume:nume.value,poza:e.target.result,prezent:true,emotie:""});
+  save();drawKids();nume.value="";poza.value="";
+ };
+ r.readAsDataURL(poza.files[0]);
+}
+function drawKids(){
+ listaCopii.innerHTML="";
+ copii.forEach((c,i)=>{
+  listaCopii.innerHTML+=`
+  <div class="copil ${c.prezent?"prezent":"absent"}">
+   <img src="${c.poza}">
+   <div class="numeCopil">${c.nume}</div>
+   <button class="btnPrezent" onclick="setPrez(${i},1)">PREZENT</button>
+   <button class="btnAbsent" onclick="setPrez(${i},0)">ABSENT</button>
+   <div class="emotii">
+    ${["🙂","😢","😡","😴","😍","😌"].map(e=><button class="${c.emotie==e?"sel":""}" onclick="setEmo(${i},'${e}')">${e}</button>).join("")}
+   </div>
+   <button class="btnSterge" onclick="stergeCopil(${i})">STERGE</button>
+  </div>`;
+ });
+}
+function setPrez(i,v){copii[i].prezent=v;save();drawKids()}
+function setEmo(i,e){copii[i].emotie=e;save();drawKids()}
+function stergeCopil(i){copii.splice(i,1);save();drawKids()}
+drawKids();
+
+/* ANOTIMP */
+let anotimp=localStorage.getItem("anotimp")||"";
+let anot=JSON.parse(localStorage.getItem("anotimpuri"))||{Primavara:"",Vara:"",Toamna:"",Iarna:""};
+function saveAn(){localStorage.setItem("anotimpuri",JSON.stringify(anot))}
+function drawAn(){
+ anotimpuri.innerHTML="";
+ for(let k in anot){
+  anotimpuri.innerHTML+=`
+  <div class="card ${k.toLowerCase()} ${anotimp===k?"selectat":""}" onclick="selAn('${k}')">
+   <input type="file" onclick="event.stopPropagation()" onchange="loadAn('${k}',this)">
+   <img src="${anot[k]}">
+   <div class="seasonName">${k.toUpperCase()}</div>
+  </div>`;
+ }
+}
+function loadAn(k,i){
+ let r=new FileReader();
+ r.onload=e=>{anot[k]=e.target.result;saveAn();drawAn()};
+ r.readAsDataURL(i.files[0]);
+}
+function selAn(k){
+ anotimp=k;
+ localStorage.setItem("anotimp",k);
+ albina.innerText=k=="Iarna"?"🧣":k=="Vara"?"😎":k=="Primavara"?"🌼":"🧥";
+ drawAn();
+}
+window.addEventListener("load",()=>{drawAn();if(anotimp)selAn(anotimp)});
+
+/* VREME */
+let vreme=localStorage.getItem("vreme")||"";
+const vremeOpt=[
+ {k:"Insorit",i:"☀️"},
+ {k:"Innorat",i:"☁️"},
+ {k:"Soare cu nori",i:"🌤️"},
+ {k:"Ploios",i:"🌧️"},
+ {k:"Ninsoare",i:"❄️"}
+];
+function drawVreme(){
+ vremea.innerHTML="";
+ vremeOpt.forEach(v=>{
+  vremea.innerHTML+=`
+  <div class="card ${vreme===v.k?"selectat":""}" onclick="selectVreme('${v.k}')">
+   <div class="vremeIcon">${v.i}</div>
+   <div class="vremeLabel">${v.k}</div>
+  </div>`;
+ });
+}
+function selectVreme(v){vreme=v;localStorage.setItem("vreme",v);drawVreme()}
+drawVreme();
+
+/* RAPORT + PDF */
+function emoText(e){
+ return {"🙂":"fericit","😢":"trist","😡":"furios","😴":"somnoros","😍":"iubaret","😌":"relaxat"}[e]||"neselectat";
+}
+function genRaport(){
+ let r="";
+ copii.forEach(c=>{r+=${c.nume} - ${c.prezent?"prezent":"absent"} - ${emoText(c.emotie)}<br>});
+ raport.innerHTML=
+ "Ziua: "+azi.innerText+"<br>"+
+ "Data: "+ziua.innerText+" "+luna.innerText+" "+anul.innerText+"<br>"+
+ "Vreme: "+vreme+"<br>"+
+ "Anotimp: "+anotimp+"<br><br>"+r;
+}
+function genPDF(){
+ const {jsPDF}=window.jspdf;
+ let d=new jsPDF(),y=20;
+ d.text("Raport intalnire dimineata",10,y);y+=10;
+ d.text("Ziua: "+azi.innerText,10,y);y+=7;
+ d.text("Data: "+ziua.innerText+" "+luna.innerText+" "+anul.innerText,10,y);y+=7;
+ d.text("Vreme: "+vreme,10,y);y+=7;
+ d.text("Anotimp: "+anotimp,10,y);y+=10;
+ copii.forEach(c=>{d.text(${c.nume} - ${c.prezent?"prezent":"absent"} - ${emoText(c.emotie)},10,y);y+=7});
+ d.save("raport_dimineata.pdf");
+}
+
+/* IMPORT / EXPORT */
+function colecteazaTot(){
+ return {
+  copii, anotimp, anot, vreme,
+  zile:{ieri:ieri.innerText,azi:azi.innerText,maine:maine.innerText},
+  data:{ziua:ziua.innerText,luna:luna.innerText,anul:anul.innerText}
+ };
+}
+function aplicaTot(d){
+ copii=d.copii||[];
+ anotimp=d.anotimp||"";
+ anot=d.anot||anot;
+ vreme=d.vreme||"";
+ drawKids();drawAn();drawVreme();
+ if(anotimp)selAn(anotimp);
+ if(d.zile){ieri.innerText=d.zile.ieri||"";azi.innerText=d.zile.azi||"";maine.innerText=d.zile.maine||""}
+ if(d.data){ziua.innerText=d.data.ziua||"";luna.innerText=d.data.luna||"";anul.innerText=d.data.anul||""}
+ localStorage.setItem("copii",JSON.stringify(copii));
+ localStorage.setItem("anotimp",anotimp);
+ localStorage.setItem("anotimpuri",JSON.stringify(anot));
+ localStorage.setItem("vreme",vreme);
+}
+function exportData(){
+ const b=new Blob([JSON.stringify(colecteazaTot(),null,2)],{type:"application/json"});
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(b);
+ a.download="intalnirea_de_dimineata.json";
+ a.click();
+}
+function importData(){
+ if(!confirm("Sigur vrei sa incarci setarile salvate?"))return;
+ document.getElementById("importFile").click();
+}
+document.getElementById("importFile").addEventListener("change",function(){
+ const f=this.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=e=>aplicaTot(JSON.parse(e.target.result));
+ r.readAsText(f);
+});
+
+
+/* ✅ ADAUGAT: incarcare automata din date.json (fara Import manual) */
+window.addEventListener("DOMContentLoaded", async () => {
+  const data = await incarcaDateDinFisier();
+  if (data) aplicaTot(data);
+});
+</script>
+
+<script>
+function resetZiNoua(){
+  if(!confirm("Sigur incepi o zi noua? Toate selectiile vor fi resetate.")) return;
+
+  /* RESET COPII (prezenta + emotii) */
+  copii = copii.map(c => ({
+    ...c,
+    prezent: false,
+    emotie: ""
+  }));
+  save();
+  drawKids();
+
+  /* RESET ANOTIMP SELECTAT (pozele raman) */
+  anotimp = "";
+  localStorage.removeItem("anotimp");
+  albina.innerText = "";
+  drawAn();
+
+  /* RESET VREME */
+  vreme = "";
+  localStorage.removeItem("vreme");
+  drawVreme();
+
+  /* RESET ZILE SAPTAMANA */
+  ieri.innerText = "";
+  azi.innerText = "";
+  maine.innerText = "";
+
+  /* RESET DATA */
+  ziua.innerText = "";
+  luna.innerText = "";
+  anul.innerText = "";
+
+  /* GOLIRE RAPORT */
+  raport.innerHTML = "";
+}
+</script>
+
+
+</body>
+</html
