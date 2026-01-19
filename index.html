@@ -6,20 +6,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- ✅ ADAUGAT: incarcare automata din date.json -->
-<script>
-async function incarcaDateDinFisier() {
-  try {
-    const r = await fetch("./date.json", { cache: "no-store" });
-    if (!r.ok) throw new Error("Nu exista date.json");
-    return await r.json();
-  } catch (e) {
-    console.log("Nu pot incarca date.json:", e.message);
-    return null;
-  }
-}
-</script>
-
 <style>
 body{
  font-family: Comic Sans MS, Arial;
@@ -111,7 +97,7 @@ h1{text-align:center}
   </button>
 
   <input type="file" id="importFile" accept=".json" style="display:none">
-</div>
+<div id="mesajImport" style="margin-top:10px;font-weight:bold;"></div>
 
 <button onclick="resetZiNoua()" style="background:#e67e22;color:white;padding:8px 14px;border:none;border-radius:10px;font-weight:bold;margin-left:10px">
   Zi noua (reset selectii)
@@ -199,17 +185,39 @@ document.querySelectorAll(".zone").forEach(z=>{
   e.preventDefault();
   z.querySelector("span").innerText=dragged;
  });
+ // ✅ CLICK pe zilele saptamanii (pentru touch)
+// Pune pe rand: IERI -> AZI -> MAINE
+let pozZi = 0; // 0=ieri, 1=azi, 2=maine
+
+document.querySelectorAll(".day").forEach(d=>{
+  d.addEventListener("click", ()=>{
+    if(pozZi===0) { ieri.innerText = d.innerText; pozZi = 1; return; }
+    if(pozZi===1) { azi.innerText  = d.innerText; pozZi = 2; return; }
+    maine.innerText = d.innerText;
+    pozZi = 0;
+  });
+});
 });
 
 /* DATA */
-for(let i=1;i<=31;i++)listaZile.innerHTML+=<div class="drag zi" draggable="true">${i}</div>;
+for(let i=1;i<=31;i++)listaZile.innerHTML+=`<div class="drag zi" draggable="true">${i}</div>`;
 [
  ["Ianuarie","iarna"],["Februarie","iarna"],["Martie","primavara"],
  ["Aprilie","primavara"],["Mai","primavara"],["Iunie","vara"],
  ["Iulie","vara"],["August","vara"],["Septembrie","toamna"],
  ["Octombrie","toamna"],["Noiembrie","toamna"],["Decembrie","iarna"]
-].forEach(l=>listaLuni.innerHTML+=<div class="drag ${l[1]}" draggable="true">${l[0]}</div>);
-for(let a=2024;a<=2035;a++)listaAni.innerHTML+=<div class="drag an" draggable="true">${a}</div>;
+].forEach(l=>listaLuni.innerHTML+=`<div class="drag ${l[1]}" draggable="true">${l[0]}</div>`);
+for(let a=2024;a<=2035;a++)listaAni.innerHTML+=`<div class="drag an" draggable="true">${a}</div>`;
+ // ✅ CLICK pe tabla (alternativa la drag&drop)
+listaZile.addEventListener("click", (e)=>{
+  if(e.target.classList.contains("drag")) ziua.innerText = e.target.innerText;
+});
+listaLuni.addEventListener("click", (e)=>{
+  if(e.target.classList.contains("drag")) luna.innerText = e.target.innerText;
+});
+listaAni.addEventListener("click", (e)=>{
+  if(e.target.classList.contains("drag")) anul.innerText = e.target.innerText;
+});
 
 /* COPII */
 let copii=JSON.parse(localStorage.getItem("copii"))||[];
@@ -233,7 +241,7 @@ function drawKids(){
    <button class="btnPrezent" onclick="setPrez(${i},1)">PREZENT</button>
    <button class="btnAbsent" onclick="setPrez(${i},0)">ABSENT</button>
    <div class="emotii">
-    ${["🙂","😢","😡","😴","😍","😌"].map(e=><button class="${c.emotie==e?"sel":""}" onclick="setEmo(${i},'${e}')">${e}</button>).join("")}
+    ${["🙂","😢","😡","😴","😍","😌"].map(e=>`<button class="${c.emotie==e?"sel":""}" onclick="setEmo(${i},'${e}')">${e}</button>`).join("")}
    </div>
    <button class="btnSterge" onclick="stergeCopil(${i})">STERGE</button>
   </div>`;
@@ -300,7 +308,7 @@ function emoText(e){
 }
 function genRaport(){
  let r="";
- copii.forEach(c=>{r+=${c.nume} - ${c.prezent?"prezent":"absent"} - ${emoText(c.emotie)}<br>});
+ copii.forEach(c=>{r+=`${c.nume} - ${c.prezent?"prezent":"absent"} - ${emoText(c.emotie)}<br>`});
  raport.innerHTML=
  "Ziua: "+azi.innerText+"<br>"+
  "Data: "+ziua.innerText+" "+luna.innerText+" "+anul.innerText+"<br>"+
@@ -315,7 +323,7 @@ function genPDF(){
  d.text("Data: "+ziua.innerText+" "+luna.innerText+" "+anul.innerText,10,y);y+=7;
  d.text("Vreme: "+vreme,10,y);y+=7;
  d.text("Anotimp: "+anotimp,10,y);y+=10;
- copii.forEach(c=>{d.text(${c.nume} - ${c.prezent?"prezent":"absent"} - ${emoText(c.emotie)},10,y);y+=7});
+ copii.forEach(c=>{d.text(`${c.nume} - ${c.prezent?"prezent":"absent"} - ${emoText(c.emotie)}`,10,y);y+=7});
  d.save("raport_dimineata.pdf");
 }
 
@@ -338,7 +346,8 @@ function aplicaTot(d){
  if(d.data){ziua.innerText=d.data.ziua||"";luna.innerText=d.data.luna||"";anul.innerText=d.data.anul||""}
  localStorage.setItem("copii",JSON.stringify(copii));
  localStorage.setItem("anotimp",anotimp);
- localStorage.setItem("anotimpuri",JSON.stringify(anot));
+ try{ localStorage.setItem("anotimpuri", JSON.stringify(anot)); }
+catch(e){ console.log("anotimpuri prea mare, nu salvez in localStorage"); }
  localStorage.setItem("vreme",vreme);
 }
 function exportData(){
@@ -348,22 +357,29 @@ function exportData(){
  a.download="intalnirea_de_dimineata.json";
  a.click();
 }
-function importData(){
- if(!confirm("Sigur vrei sa incarci setarile salvate?"))return;
- document.getElementById("importFile").click();
+async function importData(){
+  try{
+    mesajImport.innerHTML = "⏳ Se importă datele...";
+    mesajImport.style.color = "green";
+
+    const r = await fetch("./date.json", { cache: "no-store" });
+    if(!r.ok) throw new Error("Nu gasesc date.json in aplicatie!");
+
+    const data = await r.json();
+    aplicaTot(data);
+
+    mesajImport.innerHTML = "✅ Import reușit din date.json!";
+    mesajImport.style.color = "green";
+  }catch(e){
+    mesajImport.innerHTML = "❌ Eroare import: " + e.message;
+    mesajImport.style.color = "red";
+  }
 }
 document.getElementById("importFile").addEventListener("change",function(){
  const f=this.files[0];if(!f)return;
  const r=new FileReader();
  r.onload=e=>aplicaTot(JSON.parse(e.target.result));
  r.readAsText(f);
-});
-
-
-/* ✅ ADAUGAT: incarcare automata din date.json (fara Import manual) */
-window.addEventListener("DOMContentLoaded", async () => {
-  const data = await incarcaDateDinFisier();
-  if (data) aplicaTot(data);
 });
 </script>
 
@@ -408,4 +424,4 @@ function resetZiNoua(){
 
 
 </body>
-</html
+</html>
